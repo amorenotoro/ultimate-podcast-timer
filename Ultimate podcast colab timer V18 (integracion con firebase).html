@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Podcast Colab Timer</title>
+    <!-- Usar un CDN específico para desarrollo de Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Cargar Firebase desde el CDN -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .dark-bg { background-color: #1a1a1a; }
+        .gold-text { color: #FFD700; }
+        .gold-bg { background-color: #FFD700; }
+    </style>
+</head>
+<body class="dark-bg flex flex-col items-center justify-center min-h-screen text-white">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full">
+        <h1 class="text-2xl font-bold text-center gold-text mb-4">Ultimate Podcast Colab Timer</h1>
+        
+        <div id="time-display" class="text-4xl font-mono text-center gold-text mb-6">00:00:00</div>
+
+        <div class="flex justify-center mb-4 space-x-4">
+            <button id="start-btn" class="gold-bg text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-600">Start</button>
+            <button id="stop-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600">Stop</button>
+        </div>
+
+        <div class="flex justify-center mb-4">
+            <input id="note-input" type="text" placeholder="Escribe una nota breve" class="px-4 py-2 w-full rounded-lg text-black mb-2">
+            <button id="note-btn" class="gold-bg text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-600">Agregar Hito</button>
+        </div>
+
+        <h2 class="text-lg font-semibold gold-text mb-2">Hitos:</h2>
+        <ul id="note-list" class="list-disc pl-6 text-gray-400"></ul>
+
+        <div class="mt-4 text-center">
+            <button id="reset-btn" class="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROJECT_ID.firebaseapp.com",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_PROJECT_ID.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID",
+            databaseURL: "https://TU_PROJECT_ID.firebaseio.com"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let startTime = 0, updatedTime = 0, difference = 0, tInterval, running = false;
+        const display = document.getElementById('time-display');
+        const noteList = document.getElementById('note-list');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const noteInput = document.getElementById('note-input');
+        const noteBtn = document.getElementById('note-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timerRef = db.ref('timer');
+        const notesRef = db.ref('notes');
+
+        // Función para sincronizar el cronómetro en tiempo real
+        function syncTimer() {
+            timerRef.on('value', snapshot => {
+                const data = snapshot.val();
+                if (data) {
+                    startTime = data.startTime || new Date().getTime();
+                    running = data.running;
+                    difference = data.difference || 0;
+
+                    if (running) {
+                        startTime = data.startTime;  
+                        if (!tInterval) {
+                            tInterval = setInterval(updateTime, 1000);
+                        }
+                    } else {
+                        clearInterval(tInterval);
+                        tInterval = null;
+                        display.textContent = formatTime(difference);
+                    }
+                }
+            });
+
+            // Sincronizar los hitos entre los usuarios
+            notesRef.on('child_added', snapshot => {
+                const note = snapshot.val();
+                const li = document.createElement('li');
+                li.textContent = `${note.time} - ${note.text}`;
+                noteList.appendChild(li);
+            });
+        }
+
+        // Función para iniciar el cronómetro
+        function startTimer() {
+            if (!running) {
+                startTime = new Date().getTime() - difference;
+                timerRef.set({ startTime, running: true, difference });
+                tInterval = setInterval(updateTime, 1000);
+                running = true;
+            }
+        }
+
+        // Función para detener el cronómetro
+        function stopTimer() {
+            if (running) {
+                clearInterval(tInterval); 
+                difference = new Date().getTime() - startTime; 
+                timerRef.set({ startTime, running: false, difference }); 
+                running = false;
+                display.textContent = formatTime(difference); 
+            }
+        }
+
+        // Función para actualizar el tiempo en pantalla
+        function updateTime() {
+            if (!running) return; 
+            updatedTime = new Date().getTime() - startTime;
+            display.textContent = formatTime(updatedTime);
+        }
+
+        // Función para formatear el tiempo en horas, minutos y segundos
+        function formatTime(time) {
+            const hours = Math.floor((time % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((time % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((time % (1000 * 60)) / 1000);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Función para agregar un hito
+        function addNote() {
+            if (running || difference) {
+                const currentTime = display.textContent;
+                const noteText = noteInput.value || "Sin nota";
+                notesRef.push({ time: currentTime, text: noteText });
+                noteInput.value = "";
+            }
+        }
+
+        // Resetear cronómetro y notas
+        function resetAll() {
+            clearInterval(tInterval);
+            running = false;
+            difference = 0;
+            display.textContent = '00:00:00';
+            noteList.innerHTML = '';
+            timerRef.set({ startTime: null, running: false, difference: 0 });
+            notesRef.remove();
+        }
+
+        // Eventos de los botones
+        startBtn.addEventListener('click', startTimer);
+        stopBtn.addEventListener('click', stopTimer);
+        noteBtn.addEventListener('click', addNote);
+        resetBtn.addEventListener('click', resetAll);
+
+        // Sincronizar el cronómetro y las notas al cargar
+        syncTimer();
+    </script>
+</body>
+</html>
