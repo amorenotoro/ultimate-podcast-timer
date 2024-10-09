@@ -74,20 +74,25 @@
                 if (data) {
                     startTime = data.startTime || new Date().getTime();
                     running = data.running;
-                    difference = data.difference || 0;
-
-                    if (running) {
-                        startTime = data.startTime;  
-                        if (!tInterval) {
-                            tInterval = setInterval(updateTime, 1000);
-                        }
-                    } else {
-                        clearInterval(tInterval);
-                        tInterval = null;
-                        display.textContent = formatTime(difference);
+                if (running) {
+                    startTime = data.startTime;  // Cargar tiempo desde la base de datos
+                    if (!tInterval) {
+                        tInterval = setInterval(updateTime, 1000);
                     }
+                } else {
+                    clearInterval(tInterval);
+                    tInterval = null;
                 }
-            });
+            }
+        });
+
+    notesRef.on('child_added', snapshot => {
+        const note = snapshot.val();
+        const li = document.createElement('li');
+        li.textContent = `${note.time} - ${note.text}`;
+        noteList.appendChild(li);
+    });
+}
 
             // Sincronizar los hitos entre los usuarios
             notesRef.on('child_added', snapshot => {
