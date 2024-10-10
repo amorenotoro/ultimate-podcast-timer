@@ -4,11 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Podcast Colab Timer</title>
-    <!-- Usar un CDN específico para desarrollo de Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <!-- Cargar Firebase desde el CDN -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .dark-bg { background-color: #1a1a1a; }
@@ -40,21 +36,26 @@
         </div>
     </div>
 
-    <script>
-        // Configuración de Firebase
+    <script type="module">
+        // Importar las funciones necesarias de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
+
+        // Tu configuración de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDkOeOhvMUDcvWwks-eddZivrzx8yIPW30",
             authDomain: "ultimate-podcast-colab-timer.firebaseapp.com",
+            databaseURL: "https://ultimate-podcast-colab-timer-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "ultimate-podcast-colab-timer",
             storageBucket: "ultimate-podcast-colab-timer.appspot.com",
             messagingSenderId: "894715765400",
             appId: "1:894715765400:web:1784a85e7d5f321fa526ed",
-            databaseURL: "https://ultimate-podcast-colab-timer-default-rtdb.europe-west1.firebasedatabase.app"
+            measurementId: "G-QS48KMCJ30"
         };
 
         // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
         let startTime = 0, updatedTime = 0, difference = 0, tInterval, running = false;
         const display = document.getElementById('time-display');
@@ -64,12 +65,12 @@
         const noteInput = document.getElementById('note-input');
         const noteBtn = document.getElementById('note-btn');
         const resetBtn = document.getElementById('reset-btn');
-        const timerRef = db.ref('timer');
-        const notesRef = db.ref('notes');
+        const timerRef = ref(db, 'timer');
+        const notesRef = ref(db, 'notes');
 
         // Función para sincronizar el cronómetro en tiempo real
         function syncTimer() {
-            timerRef.on('value', snapshot => {
+            onValue(timerRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
                     startTime = data.startTime || new Date().getTime();
@@ -77,6 +78,7 @@
                     difference = data.difference || 0;
 
                     if (running) {
+                        startTime = data.startTime;  
                         if (!tInterval) {
                             tInterval = setInterval(updateTime, 1000);
                         }
@@ -89,11 +91,16 @@
             });
 
             // Sincronizar los hitos entre los usuarios
-            notesRef.on('child_added', snapshot => {
-                const note = snapshot.val();
-                const li = document.createElement('li');
-                li.textContent = `${note.time} - ${note.text}`;
-                noteList.appendChild(li);
+            onValue(notesRef, (snapshot) => {
+                const notes = snapshot.val();
+                noteList.innerHTML = ''; // Limpiar la lista antes de añadir nuevas notas
+                if (notes) {
+                    Object.values(notes).forEach(note => {
+                        const li = document.createElement('li');
+                        li.textContent = `${note.time} - ${note.text}`;
+                        noteList.appendChild(li);
+                    });
+                }
             });
         }
 
@@ -101,7 +108,7 @@
         function startTimer() {
             if (!running) {
                 startTime = new Date().getTime() - difference;
-                timerRef.set({ startTime, running: true, difference });
+                set(timerRef, { startTime, running: true, difference });
                 tInterval = setInterval(updateTime, 1000);
                 running = true;
             }
@@ -112,7 +119,7 @@
             if (running) {
                 clearInterval(tInterval); 
                 difference = new Date().getTime() - startTime; 
-                timerRef.set({ startTime, running: false, difference }); 
+                set(timerRef, { startTime, running: false, difference });
                 running = false;
                 display.textContent = formatTime(difference); 
             }
@@ -138,25 +145,20 @@
             if (running || difference) {
                 const currentTime = display.textContent;
                 const noteText = noteInput.value || "Sin nota";
-                if (noteText.trim()) {
-                    notesRef.push({ time: currentTime, text: noteText });
-                    noteInput.value = ""; // Limpiar el campo de entrada
-                    console.log("Hito agregado:", currentTime, noteText);
-                } else {
-                    alert("Por favor ingrese una nota antes de agregar un hito.");
-                }
+                push(notesRef, { time: currentTime, text: noteText });
+                noteInput.value = "";
             }
         }
 
-        // Resetear cronómetro y notas
+        // Función para resetear el cronómetro y las notas
         function resetAll() {
             clearInterval(tInterval);
             running = false;
             difference = 0;
             display.textContent = '00:00:00';
             noteList.innerHTML = '';
-            timerRef.set({ startTime: null, running: false, difference: 0 });
-            notesRef.remove();
+            set(timerRef, { startTime: null, running: false, difference: 0 });
+            remove(notesRef); // Eliminar todos los hitos
         }
 
         // Eventos de los botones
