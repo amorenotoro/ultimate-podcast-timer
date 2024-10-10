@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Podcast Colab Timer</title>
+    <!-- Usar un CDN específico para desarrollo de Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Cargar Firebase desde el CDN -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
@@ -41,13 +43,13 @@
     <script>
         // Configuración de Firebase
         const firebaseConfig = {
-            apiKey: "AIzaSyDkOeOhvMUDcvWwks-eddZivrzx8yIPW30",
-            authDomain: "ultimate-podcast-colab-timer.firebaseapp.com",
-            projectId: "ultimate-podcast-colab-timer",
-            storageBucket: "ultimate-podcast-colab-timer.appspot.com",
-            messagingSenderId: "894715765400",
-            appId: "1:894715765400:web:1784a85e7d5f321fa526ed",
-            databaseURL: "https://ultimate-podcast-colab-timer-default-rtdb.europe-west1.firebasedatabase.app"
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROJECT_ID.firebaseapp.com",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_PROJECT_ID.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID",
+            databaseURL: "https://TU_PROJECT_ID.firebaseio.com"
         };
 
         // Inicializar Firebase
@@ -136,8 +138,13 @@
             if (running || difference) {
                 const currentTime = display.textContent;
                 const noteText = noteInput.value || "Sin nota";
-                notesRef.push({ time: currentTime, text: noteText });
-                noteInput.value = "";
+                if (noteText.trim()) {
+                    notesRef.push({ time: currentTime, text: noteText });
+                    noteInput.value = ""; // Limpiar el campo de entrada
+                    console.log("Hito agregado:", currentTime, noteText);
+                } else {
+                    alert("Por favor ingrese una nota antes de agregar un hito.");
+                }
             }
         }
 
