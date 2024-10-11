@@ -6,6 +6,7 @@
     <title>Ultimate Podcast Colab Timer</title>
     <link rel="icon" href="https://raw.githubusercontent.com/FelipeMarbajo/ultimate-podcast-timer/3616d730510ff468907d7d2c2abf8a9602a5d4b1/favicon.jpeg" type="image/jpeg"> <!-- Favicon -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome -->
     <style>
         body { font-family: 'Inter', sans-serif; }
         .dark-bg { background-color: #1a1a1a; }
@@ -26,8 +27,14 @@
         </div>
 
         <div class="flex justify-center mb-4">
-            <input id="note-input" type="text" placeholder="Escribe una nota breve" class="px-4 py-2 w-full rounded-lg text-black mb-2">
+            <input id="note-input" type="text" placeholder="Escribe una nota breve" class="px-4 py-2 rounded-lg text-black mb-2 mr-2">
+        </div>
+
+        <div class="flex justify-center mb-4">
             <button id="note-btn" class="gold-bg text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-600">Agregar Hito</button>
+            <button id="mute-btn" class="bg-blue-500 text-white px-2 py-2 rounded-lg shadow hover:bg-blue-600 ml-2">
+                <i id="mute-icon" class="fas fa-volume-up"></i> <!-- Icono de altavoz -->
+            </button>
         </div>
 
         <h2 class="text-lg font-semibold gold-text mb-2">Hitos:</h2>
@@ -70,9 +77,13 @@
         const noteInput = document.getElementById('note-input');
         const noteBtn = document.getElementById('note-btn');
         const resetBtn = document.getElementById('reset-btn');
+        const muteBtn = document.getElementById('mute-btn');
+        const muteIcon = document.getElementById('mute-icon');
         const bellSound = document.getElementById('bell-sound');
         const timerRef = ref(db, 'timer');
         const notesRef = ref(db, 'notes');
+
+        let isMuted = false; // Variable para controlar el estado de silencio
 
         // Función para sincronizar el cronómetro en tiempo real
         function syncTimer() {
@@ -86,7 +97,7 @@
                     if (running) {
                         startTime = data.startTime;  
                         if (!tInterval) {
-                            tInterval = setInterval(updateTime, 1000);
+                            tInterval = setInterval(updateTime, 500); // Cambiar a 500ms para actualizar más rápido
                         }
                     } else {
                         clearInterval(tInterval);
@@ -106,10 +117,8 @@
                         const note = notes[key];
                         const li = document.createElement('li');
                         li.textContent = `${note.time} - ${note.text}`;
-                        if (index === noteKeys.length - 1) {
-                            li.classList.add('last-note'); // Resaltar último hito con negrita y color dorado
-                        }
                         noteList.appendChild(li);
+                        li.classList.toggle('last-note', index === noteKeys.length - 1); // Resaltar último hito
                     });
                 }
             });
@@ -118,9 +127,13 @@
         // Función para iniciar el cronómetro
         function startTimer() {
             if (!running) {
-                startTime = new Date().getTime() - difference;
+                if (difference === 0) {
+                    startTime = new Date().getTime();
+                } else {
+                    startTime = new Date().getTime() - difference; // Agregar la diferencia para retomar el tiempo
+                }
                 set(timerRef, { startTime, running: true, difference });
-                tInterval = setInterval(updateTime, 1000);
+                tInterval = setInterval(updateTime, 500); // Actualización más rápida
                 running = true;
             }
         }
@@ -151,46 +164,54 @@
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        // Función para agregar un hito
+        // Función para agregar una nota
         function addNote() {
-            if (running || difference) {
-                const currentTime = display.textContent;
-                const noteText = noteInput.value || "Sin nota";
-                push(notesRef, { time: currentTime, text: noteText });
+            const noteText = noteInput.value.trim();
+            if (!noteText) {
+                alert("La nota no puede estar vacía"); 
+                return;
+            }
 
-                // Reproducir sonido de campanita
-                bellSound.play();
+            const noteTime = formatTime(difference);
+            const newNoteRef = push(notesRef);
+            set(newNoteRef, { time: noteTime, text: noteText });
 
-                // Limpiar campo de nota
-                noteInput.value = "";
+            noteInput.value = '';
+
+            if (!isMuted) {
+                bellSound.play(); // Sonar campana al agregar hito si no está silenciado
             }
         }
 
-        // Función para resetear el cronómetro y las notas
-        function resetAll() {
+        // Función para reiniciar el cronómetro
+        function resetTimer() {
             clearInterval(tInterval);
-            running = false;
-            difference = 0;
             display.textContent = '00:00:00';
-            noteList.innerHTML = '';
+            difference = 0;
+            running = false;
             set(timerRef, { startTime: null, running: false, difference: 0 });
-            remove(notesRef); // Eliminar todos los hitos
+            remove(notesRef); // Eliminar todas las notas de Firebase
         }
 
-        // Evento para enviar hito al pulsar "Enter"
-        noteInput.addEventListener('keypress', (e) => {
+        // Eventos para los botones
+        startBtn.addEventListener('click', startTimer);
+        stopBtn.addEventListener('click', stopTimer);
+        noteBtn.addEventListener('click', addNote);
+        resetBtn.addEventListener('click', resetTimer);
+        muteBtn.addEventListener('click', () => {
+            isMuted = !isMuted;
+            muteIcon.classList.toggle('fa-volume-up', !isMuted);
+            muteIcon.classList.toggle('fa-volume-mute', isMuted);
+        });
+
+        // Enviar hito pulsando "Enter"
+        noteInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
                 addNote();
             }
         });
 
-        // Asignar eventos a botones
-        startBtn.addEventListener('click', startTimer);
-        stopBtn.addEventListener('click', stopTimer);
-        noteBtn.addEventListener('click', addNote);
-        resetBtn.addEventListener('click', resetAll);
-
-        // Sincronizar el cronómetro y las notas al cargar
+        // Sincronizar el cronómetro al cargar la página
         syncTimer();
     </script>
 </body>
