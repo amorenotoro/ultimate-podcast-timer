@@ -90,6 +90,7 @@
             onValue(timerRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
+                    console.log('Datos del cronómetro desde Firebase:', data); // Verificar los datos
                     startTime = data.startTime || new Date().getTime();
                     running = data.running;
                     difference = data.difference || 0;
@@ -112,6 +113,7 @@
                 const notes = snapshot.val();
                 noteList.innerHTML = ''; // Limpiar la lista antes de añadir nuevas notas
                 if (notes) {
+                    console.log('Notas sincronizadas desde Firebase:', notes); // Verificar los datos
                     let noteKeys = Object.keys(notes);
                     noteKeys.forEach((key, index) => {
                         const note = notes[key];
@@ -132,7 +134,13 @@
                 } else {
                     startTime = new Date().getTime() - difference; // Agregar la diferencia para retomar el tiempo
                 }
-                set(timerRef, { startTime, running: true, difference });
+                set(timerRef, { startTime, running: true, difference })
+                    .then(() => {
+                        console.log('Cronómetro iniciado y sincronizado con Firebase');
+                    })
+                    .catch((error) => {
+                        console.error('Error al iniciar cronómetro:', error);
+                    });
                 tInterval = setInterval(updateTime, 500); // Actualización más rápida
                 running = true;
             }
@@ -141,11 +149,17 @@
         // Función para detener el cronómetro
         function stopTimer() {
             if (running) {
-                clearInterval(tInterval); 
-                difference = new Date().getTime() - startTime; 
-                set(timerRef, { startTime, running: false, difference });
+                clearInterval(tInterval);
+                difference = new Date().getTime() - startTime;
+                set(timerRef, { startTime, running: false, difference })
+                    .then(() => {
+                        console.log('Cronómetro detenido y sincronizado con Firebase');
+                    })
+                    .catch((error) => {
+                        console.error('Error al detener cronómetro:', error);
+                    });
                 running = false;
-                display.textContent = formatTime(difference); 
+                display.textContent = formatTime(difference);
             }
         }
 
@@ -170,49 +184,53 @@
             if (!noteText) {
                 alert("La nota no puede estar vacía");
                 return;
+            }
+
+            // Usar updatedTime si el cronómetro está corriendo, o difference si está detenido
+            const noteTime = running ? formatTime(updatedTime) : formatTime(difference);
+
+            // Asegurarse de que Firebase está sincronizado antes de guardar la nota
+            set(push(notesRef), { time: noteTime, text: noteText })
+                .then(() => {
+                    console.log('Hito guardado en Firebase:', noteTime);
+                    noteInput.value = ''; // Limpiar el campo de entrada
+                    if (!isMuted) {
+                        bellSound.play(); // Sonar campana al agregar hito si no está silenciado
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error al guardar hito:', error);
+                });
         }
 
-            // Usa updatedTime si el cronómetro está corriendo, o difference si está detenido
-            const noteTime = running ? formatTime(updatedTime) : formatTime(difference);
-            
-            const newNoteRef = push(notesRef);
-            set(newNoteRef, { time: noteTime, text: noteText });
-        
-            noteInput.value = '';
-        
-            if (!isMuted) {
-                bellSound.play(); // Sonar campana al agregar hito si no está silenciado
-            }
-        }
-        // Función para reiniciar el cronómetro
+        // Función para resetear el cronómetro y los hitos
         function resetTimer() {
             clearInterval(tInterval);
+            tInterval = null;
             display.textContent = '00:00:00';
             difference = 0;
+            startTime = 0;
             running = false;
-            set(timerRef, { startTime: null, running: false, difference: 0 });
-            remove(notesRef); // Eliminar todas las notas de Firebase
+            remove(timerRef); // Eliminar datos del cronómetro en Firebase
+            remove(notesRef); // Eliminar hitos en Firebase
+            noteList.innerHTML = ''; // Limpiar la lista de notas
         }
 
-        // Eventos para los botones
+        // Función para silenciar o activar el sonido de la campana
+        function toggleMute() {
+            isMuted = !isMuted;
+            muteIcon.classList.toggle('fa-volume-up', !isMuted);
+            muteIcon.classList.toggle('fa-volume-mute', isMuted);
+        }
+
+        // Asignar eventos a los botones
         startBtn.addEventListener('click', startTimer);
         stopBtn.addEventListener('click', stopTimer);
         noteBtn.addEventListener('click', addNote);
         resetBtn.addEventListener('click', resetTimer);
-        muteBtn.addEventListener('click', () => {
-            isMuted = !isMuted;
-            muteIcon.classList.toggle('fa-volume-up', !isMuted);
-            muteIcon.classList.toggle('fa-volume-mute', isMuted);
-        });
+        muteBtn.addEventListener('click', toggleMute);
 
-        // Enviar hito pulsando "Enter"
-        noteInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') {
-                addNote();
-            }
-        });
-
-        // Sincronizar el cronómetro al cargar la página
+        // Iniciar sincronización en tiempo real al cargar la página
         syncTimer();
     </script>
 </body>
