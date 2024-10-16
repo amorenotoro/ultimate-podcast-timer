@@ -230,6 +230,13 @@
         resetBtn.addEventListener('click', resetTimer);
         muteBtn.addEventListener('click', toggleMute);
 
+        // Enviar hito al pulsar "Enter"
+        noteInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                addNote();
+            }
+        });
+
         // Iniciar sincronización en tiempo real al cargar la página
         syncTimer();
     </script>
