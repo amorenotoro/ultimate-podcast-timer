@@ -168,21 +168,22 @@
         function addNote() {
             const noteText = noteInput.value.trim();
             if (!noteText) {
-                alert("La nota no puede estar vacía"); 
+                alert("La nota no puede estar vacía");
                 return;
-            }
+        }
 
-            const noteTime = formatTime(difference);
+            // Usa updatedTime si el cronómetro está corriendo, o difference si está detenido
+            const noteTime = running ? formatTime(updatedTime) : formatTime(difference);
+            
             const newNoteRef = push(notesRef);
             set(newNoteRef, { time: noteTime, text: noteText });
-
+        
             noteInput.value = '';
-
+        
             if (!isMuted) {
                 bellSound.play(); // Sonar campana al agregar hito si no está silenciado
             }
         }
-
         // Función para reiniciar el cronómetro
         function resetTimer() {
             clearInterval(tInterval);
