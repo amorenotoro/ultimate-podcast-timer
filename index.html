@@ -186,10 +186,8 @@
                 return;
             }
 
-            // Usar updatedTime si el cronómetro está corriendo, o difference si está detenido
             const noteTime = running ? formatTime(updatedTime) : formatTime(difference);
 
-            // Asegurarse de que Firebase está sincronizado antes de guardar la nota
             set(push(notesRef), { time: noteTime, text: noteText })
                 .then(() => {
                     console.log('Hito guardado en Firebase:', noteTime);
@@ -233,6 +231,7 @@
         // Enviar hito al pulsar "Enter"
         noteInput.addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
+                event.preventDefault(); // Prevenir comportamiento predeterminado
                 addNote();
             }
         });
